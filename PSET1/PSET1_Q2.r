@@ -20,6 +20,7 @@ data <- read.dta("/Users/veronica/Dropbox/PhD/2024_2/EC_709/PSETS_EC709/PSET1/yn
 data$log_gas <- log(data$gas)
 data$log_price <- log(data$price)
 data$log_income <- log(data$income)
+data$log_distance <- log(data$distance)
 
 # Extract the variables
 X <- data$log_price
@@ -366,6 +367,7 @@ X1 <- data$log_price
 X2 <- data$log_income
 Y <- data$log_gas
 
+data_q23 <- data[, c("log_gas", "log_price", "log_income", "log_distance")]
 
 # 2_3_1 Kernel Regression -------------------------------------------------------------------
 
@@ -383,9 +385,74 @@ Y <- data$log_gas
 
 
 # 2_3_2 locally linear ----------------------------------------------------
+# Load necessary libraries
+library(locfit)
+library(caret)  # For creating folds
+library(ggplot2) # For plotting
 
+# Define cross-validation function
+cross_validate <- function(data, bandwidth, k_folds = 5) {
+  
+  # Create k folds
+  folds <- createFolds(data$log_gas, k = k_folds, list = TRUE, returnTrain = TRUE)
+  
+  mse <- numeric(k_folds)
+  
+  for (i in seq_len(k_folds)) {
+    # Split data
+    train_data <- data[folds[[i]], ]
+    test_data <- data[-folds[[i]], ]
+    
+    # Fit the local linear regression model
+    fit <- locfit(log_gas ~ lp(log_price, nn=0, h=bandwidth, deg=1) + log_income, data = train_data)
+    
+    # Predict on test data
+    predictions <- predict(fit, newdata = test_data)
+    
+    # Calculate MSE
+    mse[i] <- mean((test_data$log_gas - predictions)^2)
+  }
+  
+  return(mean(mse))
+}
 
+# Define bandwidth range
+bandwidths <- seq(0.1, 1, length.out = 20)
+mse_results <- sapply(bandwidths, function(bw) cross_validate(data, bw))
 
+# Find the best bandwidth
+best_bandwidth <- bandwidths[which.min(mse_results)]
+
+# Print the best bandwidth
+print(paste("Best Bandwidth:", best_bandwidth))
+
+# Fit the model with the best bandwidth
+local_reg_best_multiv <- locfit(log_gas ~ lp(log_price, nn=0, h=best_bandwidth, deg=1) + log_income, data = data)
+
+# Generate a sequence of log_price values for prediction
+log_price_seq <- seq(min(data$log_price), max(data$log_price), length.out = 100)
+
+# Use a constant value for log_income (e.g., mean of log_income)
+constant_log_income <- mean(data$log_income)
+
+# Create a data frame for predictions
+prediction_data <- data.frame(
+  log_price = log_price_seq,
+  log_income = constant_log_income
+)
+
+# Predict log_gas values using the model
+prediction_data$predicted_log_gas <- predict(local_reg_best_multiv, newdata = prediction_data)
+
+# Plot the demand function
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_locpol_optimal_regression_multiv.png")
+ggplot(data, aes(x = log_price, y = log_gas)) +
+  geom_line(data = prediction_data, aes(x = log_price, y = predicted_log_gas), color = 'blue') + # Regression line
+  labs(title = "Demand Function: log_gas vs. log_price",
+       x = "log_price",
+       y = "log_gas") +
+  theme_minimal()
+dev.off()
 
 # 2_3_3 series power ------------------------------------------------------
 
