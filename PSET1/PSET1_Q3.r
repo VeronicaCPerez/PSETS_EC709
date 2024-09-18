@@ -14,7 +14,7 @@ sigma2 <- 1
 beta0 <- c(1, 1, 1/2, 1/3, 1/4, 1/5, rep(0, K - 6))
 Sigma <- outer(1:K, 1:K, function(i, j) (1/2)^abs(i - j))
 num_simulations <- 500
-num_folds <- 5  # For cross-validation
+num_folds <- 5  # For cross-validation ---  they do 5 right
 
 # Function to generate data
 generate_data <- function() {
@@ -60,7 +60,7 @@ for (s in 1:num_simulations) {
   sqrt_lasso_coefs <- coef(sqrt_lasso_fit)[-1]
   results[s, "Square-root Lasso"] <- mean((X %*% sqrt_lasso_coefs - X %*% beta0)^2)
   
-  # Post-Square-root Lasso
+  # Post-Square-root Lasso -> DONT NEED
   selected_sqrt <- which(sqrt_lasso_coefs != 0)
   post_sqrt_lasso_fit <- lm(Y ~ X[, selected_sqrt])
   post_sqrt_lasso_coefs <- rep(0, K)
@@ -77,6 +77,8 @@ for (s in 1:num_simulations) {
   post_cv_lasso_coefs <- rep(0, K)
   post_cv_lasso_coefs[selected_cv] <- coef(post_cv_lasso_fit)[-1]
   results[s, "CV Post-Lasso"] <- mean((X %*% post_cv_lasso_coefs - X %*% beta0)^2)
+  
+  # ORACLE
 }
 
 # Average prediction errors
@@ -88,4 +90,8 @@ tabulated_results <- data.frame(
   Average_Prediction_Error = round(avg_prediction_errors, 4)
 )
 
-print(tabulated_results)
+print(tabulated_results) 
+
+# need to send to overleaf
+
+## make into latex 

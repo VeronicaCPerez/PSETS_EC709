@@ -13,6 +13,7 @@ library(foreign)
 library(haven)
 library(KernSmooth)
 library(gplm)
+library(np)
 library(locpol)
 
 # Load and process the data
@@ -26,7 +27,9 @@ data$log_distance <- log(data$distance)
 X <- data$log_price
 Y <- data$log_gas
 
-# Kernel Regression
+
+# Kernel Regression -------------------------------------------------------
+
 bandwidths <- c(0.01, 0.05, 0.08, 0.1, 0.15, 0.2, 0.25, 0.3)
 
 # Perform kernel regression and plot the results
@@ -371,16 +374,10 @@ data_q23 <- data[, c("log_gas", "log_price", "log_income", "log_distance")]
 
 # 2_3_1 Kernel Regression -------------------------------------------------------------------
 
-# ignore the code find anohter package
+# ignore the code find anohter package --- ksmooth oesnt have multivariate use np
 
-# Perform kernel regression and plot the results
-# library(np)
-# model <- npreg(Y ~ X1 + X2, regtype = "lc", bwmethod = "cv.ls")
-# summary(model)
+bandwidths <- c(0.01, 0.05, 0.08, 0.1, 0.15, 0.2, 0.25, 0.3)
 
-# Plot fitted values
-# plot(model)
-# dev.off()
 
 
 
@@ -530,6 +527,8 @@ plot(X1, Y, type = "n", main = "B-spline Regression (Bivariate)",
      xlab = "Log Price", ylab = "Log Gasoline Consumption")
 lines(x_grid, predict(model_optimal_bspline, newdata = data.frame(X1 = x_grid, X2 = mean(X2))), col = "purple", lwd = 2)
 dev.off()
+
+
 
 
 # QUESTION 2_4 ------------------------------------------------------------
