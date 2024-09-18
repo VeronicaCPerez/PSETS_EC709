@@ -19,6 +19,7 @@ library(locpol)
 data <- read.dta("/Users/veronica/Dropbox/PhD/2024_2/EC_709/PSETS_EC709/PSET1/yn.dta")
 data$log_gas <- log(data$gas)
 data$log_price <- log(data$price)
+data$log_income <- log(data$income)
 
 # Extract the variables
 X <- data$log_price
@@ -221,7 +222,7 @@ png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_bspline_band
 plot(knots_seq, CV_err_bspline, type = "b", lwd = 3, col = "blue",
      xlab = "Number of Knots", ylab = "LOOCV Prediction Error",
      main = "B-spline Regression Knots Selection")
-dev.off
+dev.off()
 
 # B-spline regression with optimal number of knots
 model_optimal_bspline <- lm(Y ~ bs(X, df = optimal_knots))
@@ -359,152 +360,53 @@ print(plot)
 # QUESTION 2_3 ------------------------------------------------------------
 ###########################################################################
 
-# Extract the variables
-X1 <- log(data$price)
-X2 <- log(data$income)
-Y <- log(data$gas)
 
-# Create the matrix for predictors
-X <- cbind(X1, X2)
+# make vars
+X1 <- data$log_price
+X2 <- data$log_income
+Y <- data$log_gas
 
 
-# Kernel Regression
-bandwidths <- c(0.01, 0.05, 0.08, 0.1, 0.15, 0.2, 0.25, 0.3)
+# 2_3_1 Kernel Regression -------------------------------------------------------------------
+
+# ignore the code find anohter package
 
 # Perform kernel regression and plot the results
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_kernel_regression_comparison.png")
-plot(NULL, xlim = range(X), ylim = range(Y), 
-     main = "Kernel Regression with Different Bandwidths",
-     xlab = "Log Price", ylab = "Log Gasoline Consumption")
+# library(np)
+# model <- npreg(Y ~ X1 + X2, regtype = "lc", bwmethod = "cv.ls")
+# summary(model)
 
-colors <- c("orange", "purple", "limegreen", "blue", "red", "yellow", "green", "cyan")
-for (i in seq_along(bandwidths)) {
-  Kreg <- ksmooth(x = X, y = Y, kernel = "normal", bandwidth = bandwidths[i])
-  lines(Kreg, lwd = 2, col = colors[i])
-}
-legend("topright", legend = paste("h =", bandwidths), lwd = 2, col = colors)
-dev.off()
-
-# Cross-validation for bandwidth selection
-n <- length(X)
-h_seq <- seq(from = 0.01, to = 0.3, by = 0.01)
-CV_err_h <- numeric(length(h_seq))
-
-for (j in seq_along(h_seq)) {
-  h_using <- h_seq[j]
-  CV_err <- numeric(n)
-  
-  for (i in 1:n) {
-    X_val <- X[i]
-    Y_val <- Y[i]
-    X_tr <- X[-i]
-    Y_tr <- Y[-i]
-    
-    Y_val_predict <- ksmooth(x = X_tr, y = Y_tr, kernel = "normal", bandwidth = h_using, x.points = X_val)$y
-    CV_err[i] <- (Y_val - Y_val_predict)^2
-  }
-  
-  CV_err_h[j] <- mean(CV_err)
-}
-
-# Optimal bandwidth and plot
-optimal_bandwidth <- h_seq[which.min(CV_err_h)]
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_bandwidth_selection_kernel.png")
-plot(h_seq, CV_err_h, type = "b", lwd = 3, col = "blue",
-     xlab = "Smoothing Bandwidth", ylab = "LOOCV Prediction Error",
-     main = "Bandwidth Selection using Cross-Validation")
-dev.off()
-
-# Kernel regression with optimal bandwidth
-Kreg_optimal <- ksmooth(x = X, y = Y, kernel = "normal", bandwidth = optimal_bandwidth)
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_optimal_kernel_regression.png")
-plot(Kreg_optimal, col = "purple", lwd = 2, 
-     main = "Optimal Kernel Regression of Log Gasoline Consumption on Log Price",
-     xlab = "Log Price", ylab = "Log Gasoline Consumption")
-dev.off()
+# Plot fitted values
+# plot(model)
+# dev.off()
 
 
-# LOCALLY LINEAR ----------------------------------------------------------
+
+# 2_3_2 locally linear ----------------------------------------------------
 
 
-library(KernSmooth)
-library(ks)
-
-library(locpol) # Ensure locpol is installed and loaded
-
-# Cross-validation for Locally Linear Regression
-CV_err_h_locpol <- numeric(length(h_seq))
-
-for (j in seq_along(h_seq)) {
-  h_using <- h_seq[j]
-  CV_err <- numeric(n)
-  
-  for (i in 1:n) {
-    # Leave-one-out sets
-    X_val <- X[i]
-    Y_val <- Y[i]
-    X_tr <- X[-i]
-    Y_tr <- Y[-i]
-    
-    # Locally linear regression on training set
-    model <- locpoly(y = Y_tr, x = X_tr, kernel = "normal", bandwidth = h_using, degree = 1)
-    
-    # Predict on a grid of x-values
-    x_grid <- seq(min(X_tr), max(X_tr), length.out = 100)
-    fitted_vals <- locpoly(y = Y_tr, x = X_tr, kernel = "normal", bandwidth = h_using, degree = 1)
-    
-    # Extract fitted values from the model output
-    fitted_vals <- fitted_vals$y  # Adjust according to the actual structure of `locpoly` output
-    
-    # Find the closest x_grid value to X_val
-    closest_index <- which.min(abs(x_grid - X_val))
-    Y_val_predict <- fitted_vals[closest_index]
-    
-    # Compute squared error
-    CV_err[i] <- (Y_val - Y_val_predict)^2
-  }
-  
-  # Average CV error for current bandwidth
-  CV_err_h_locpol[j] <- mean(CV_err)
-}
-
-# Optimal bandwidth for locally linear regression
-optimal_bandwidth_locpol <- h_seq[which.min(CV_err_h_locpol)]
-
-# Plot the cross-validation error
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_locpol_bandwidth_selection.png")
-plot(h_seq, CV_err_h_locpol, type = "b", lwd = 3, col = "blue",
-     xlab = "Smoothing Bandwidth", ylab = "LOOCV Prediction Error",
-     main = "Locally Linear Regression Bandwidth Selection")
-dev.off()
-
-# Plot with optimal bandwidth
-model_optimal_locpol <- locpoly(y = Y, x = X, kernel = "normal", bandwidth = optimal_bandwidth_locpol, degree = 1)
-
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_locpol_optimal_regression.png")
-plot(model_optimal_locpol, col = "purple", lwd = 2, 
-     main = "Optimal Local Linear Regression of Log Gasoline Consumption on Log Price",
-     xlab = "Log Price", ylab = "Log Gasoline Consumption")
-dev.off()
 
 
-# SERIES POWER ------------------------------------------------------------
+# 2_3_3 series power ------------------------------------------------------
 
-# Cross-validation for Series Power Regression
-degree_seq <- 1:10
+degree_seq <- 1:8
+
+# Series Power Regression with log_price and log_income
 CV_err_poly <- numeric(length(degree_seq))
 
 for (d in degree_seq) {
   CV_err <- numeric(n)
   
   for (i in 1:n) {
-    X_val <- X[i]
+    X1_val <- X1[i]
+    X2_val <- X2[i]
     Y_val <- Y[i]
-    X_tr <- X[-i]
+    X1_tr <- X1[-i]
+    X2_tr <- X2[-i]
     Y_tr <- Y[-i]
     
-    model <- lm(Y_tr ~ poly(X_tr, d))
-    Y_val_predict <- predict(model, data.frame(X_tr = X_val))
+    model <- lm(Y_tr ~ poly(X1_tr, d) + poly(X2_tr, d))
+    Y_val_predict <- predict(model, data.frame(X1_tr = X1_val, X2_tr = X2_val))
     
     CV_err[i] <- (Y_val - Y_val_predict)^2
   }
@@ -514,46 +416,33 @@ for (d in degree_seq) {
 
 # Optimal degree and plot
 optimal_degree <- degree_seq[which.min(CV_err_poly)]
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_series_power_bandwidth_selection.png")
-plot(degree_seq, CV_err_poly, type = "b", lwd = 3, col = "blue",
-     xlab = "Degree of Polynomial", ylab = "LOOCV Prediction Error",
-     main = "Series Power Regression Degree Selection")
-dev.off()
+model_optimal_poly <- lm(Y ~ poly(X1, optimal_degree) + poly(X2, optimal_degree))
 
-# Series Power Regression with optimal degree
-model_optimal_poly <- lm(Y ~ poly(X, optimal_degree))
-x_grid <- seq(min(X), max(X), length.out = 100)
-y_grid <- predict(model_optimal_poly, newdata = data.frame(X = x_grid))
-
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_series_power_optimal_regression.png")
-plot(X, Y, type = "n", main = "Series Power Regression",
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_series_reg_bivariate.png")
+plot(X1, Y, type = "n", main = "Series Power Regression (Bivariate)",
      xlab = "Log Price", ylab = "Log Gasoline Consumption")
-lines(x_grid, y_grid, col = "purple", lwd = 2)
+lines(x_grid, predict(model_optimal_poly, newdata = data.frame(X1 = x_grid, X2 = mean(X2))), col = "purple", lwd = 2)
 dev.off()
 
 
+# 2_3_4 bs regression ------------------------------------------------------
 
-##############################################################
-#                       B SPLINE
-##############################################################
-
-library(splines)
-
-# Cross-validation for B-spline Regression
-knots_seq <- 1:10
+# B-spline regression with log_price and log_income
 CV_err_bspline <- numeric(length(knots_seq))
 
 for (k in knots_seq) {
   CV_err <- numeric(n)
   
   for (i in 1:n) {
-    X_val <- X[i]
+    X1_val <- X1[i]
+    X2_val <- X2[i]
     Y_val <- Y[i]
-    X_tr <- X[-i]
+    X1_tr <- X1[-i]
+    X2_tr <- X2[-i]
     Y_tr <- Y[-i]
     
-    model <- lm(Y_tr ~ bs(X_tr, df = k))
-    Y_val_predict <- predict(model, data.frame(X_tr = X_val))
+    model <- lm(Y_tr ~ bs(X1_tr, df = k) + X2_tr)
+    Y_val_predict <- predict(model, data.frame(X1_tr = X1_val, X2_tr = X2_val))
     
     CV_err[i] <- (Y_val - Y_val_predict)^2
   }
@@ -563,23 +452,13 @@ for (k in knots_seq) {
 
 # Optimal number of knots and plot
 optimal_knots <- knots_seq[which.min(CV_err_bspline)]
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_bspline_bandwidth_selection.png")
-plot(knots_seq, CV_err_bspline, type = "b", lwd = 3, col = "blue",
-     xlab = "Number of Knots", ylab = "LOOCV Prediction Error",
-     main = "B-spline Regression Knots Selection")
-dev.off
+model_optimal_bspline <- lm(Y ~ bs(X1, df = optimal_knots) + X2)
 
-# B-spline regression with optimal number of knots
-model_optimal_bspline <- lm(Y ~ bs(X, df = optimal_knots))
-x_grid <- seq(min(X), max(X), length.out = 100)
-y_grid <- predict(model_optimal_bspline, newdata = data.frame(X = x_grid))
-
-png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_bspline_optimal_regression.png")
-plot(X, Y, type = "n", main = "B-spline Regression",
+png("/path/to/your/output/bspline_optimal_regression_bivariate.png")
+plot(X1, Y, type = "n", main = "B-spline Regression (Bivariate)",
      xlab = "Log Price", ylab = "Log Gasoline Consumption")
-lines(x_grid, y_grid, col = "purple", lwd = 2)
+lines(x_grid, predict(model_optimal_bspline, newdata = data.frame(X1 = x_grid, X2 = mean(X2))), col = "purple", lwd = 2)
 dev.off()
-
 
 
 # QUESTION 2_4 ------------------------------------------------------------
