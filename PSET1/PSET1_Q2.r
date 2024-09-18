@@ -452,9 +452,13 @@ for (k in knots_seq) {
 
 # Optimal number of knots and plot
 optimal_knots <- knots_seq[which.min(CV_err_bspline)]
+
+# i get the optimal is 1
+# doesnt work im choosing 3
+optimal_knots <- 3
 model_optimal_bspline <- lm(Y ~ bs(X1, df = optimal_knots) + X2)
 
-png("/path/to/your/output/bspline_optimal_regression_bivariate.png")
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_3_bspline_reg_bivariate.png")
 plot(X1, Y, type = "n", main = "B-spline Regression (Bivariate)",
      xlab = "Log Price", ylab = "Log Gasoline Consumption")
 lines(x_grid, predict(model_optimal_bspline, newdata = data.frame(X1 = x_grid, X2 = mean(X2))), col = "purple", lwd = 2)
