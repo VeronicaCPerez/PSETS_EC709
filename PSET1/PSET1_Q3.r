@@ -1,20 +1,20 @@
 # 1_1 Generate a dataset with n observations ------------------------------------------------------------------
 
 set.seed(123)
+
 # Load necessary libraries
 library(mvtnorm)
 library(hdm)
 library(glmnet)
 
 # Set parameters
-set.seed(123)  # For reproducibility
 n <- 100
 K <- 500
 sigma2 <- 1
 beta0 <- c(1, 1, 1/2, 1/3, 1/4, 1/5, rep(0, K - 6))
 Sigma <- outer(1:K, 1:K, function(i, j) (1/2)^abs(i - j))
 num_simulations <- 500
-num_folds <- 5  # For cross-validation ---  they do 5 right
+num_folds <- 5  # For cross-validation
 
 # Function to generate data
 generate_data <- function() {
@@ -32,9 +32,16 @@ cv_lasso <- function(X, Y) {
 }
 
 # Storage for results
-results <- matrix(0, nrow = num_simulations, ncol = 6)  # 6 methods
-colnames(results) <- c("Lasso", "Post-Lasso", "Square-root Lasso", "Post-Square-root Lasso",
-                       "CV Lasso", "CV Post-Lasso")
+results <- matrix(0, nrow = num_simulations, ncol = 4)  # 6 methods
+bias <- matrix(0, nrow = num_simulations, ncol = 4)  # To store bias
+coef_results <- matrix(0, nrow = num_simulations, ncol = 4)  # Store coefficients
+
+colnames(coef_results) <- c("Lasso", "Post-Lasso","CV Lasso", "CV Post-Lasso")
+colnames(results) <- c("Lasso", "Post-Lasso","CV Lasso", "CV Post-Lasso")
+colnames(bias) <- c("Lasso", "Post-Lasso","CV Lasso", "CV Post-Lasso")
+
+# Storage for coefficients
+
 
 # Simulation
 for (s in 1:num_simulations) {
@@ -44,32 +51,24 @@ for (s in 1:num_simulations) {
   Y <- data$Y
   
   # Lasso estimation
-  lasso_fit <- rlasso(X, Y)
+  lasso_fit <- rlasso(X, Y, post = FALSE)
   lasso_coefs <- coef(lasso_fit)[-1]  # Exclude intercept
   results[s, "Lasso"] <- mean((X %*% lasso_coefs - X %*% beta0)^2)
+  bias[s, "Lasso"] <- mean(lasso_coefs - beta0)  # Compute bias
+  coef_results[s, "Lasso"] <- mean(lasso_coefs)
   
   # Post-Lasso
-  selected <- which(lasso_coefs != 0)
-  post_lasso_fit <- lm(Y ~ X[, selected])
-  post_lasso_coefs <- rep(0, K)
-  post_lasso_coefs[selected] <- coef(post_lasso_fit)[-1]
+  post_lasso_fit <- rlasso(X, Y, post = TRUE)
+  post_lasso_coefs <- coef(post_lasso_fit)[-1]  # Exclude intercept
   results[s, "Post-Lasso"] <- mean((X %*% post_lasso_coefs - X %*% beta0)^2)
-  
-  # Square-root Lasso
-  sqrt_lasso_fit <- rlasso(X, Y, sqrt = TRUE)
-  sqrt_lasso_coefs <- coef(sqrt_lasso_fit)[-1]
-  results[s, "Square-root Lasso"] <- mean((X %*% sqrt_lasso_coefs - X %*% beta0)^2)
-  
-  # Post-Square-root Lasso -> DONT NEED
-  selected_sqrt <- which(sqrt_lasso_coefs != 0)
-  post_sqrt_lasso_fit <- lm(Y ~ X[, selected_sqrt])
-  post_sqrt_lasso_coefs <- rep(0, K)
-  post_sqrt_lasso_coefs[selected_sqrt] <- coef(post_sqrt_lasso_fit)[-1]
-  results[s, "Post-Square-root Lasso"] <- mean((X %*% post_sqrt_lasso_coefs - X %*% beta0)^2)
+  bias[s, "Post-Lasso"] <- mean(post_lasso_coefs - beta0)  # Compute bias
+  coef_results[s, "Post-Lasso"] <- mean(post_lasso_coefs)
   
   # CV Lasso
   cv_lasso_coefs <- cv_lasso(X, Y)
   results[s, "CV Lasso"] <- mean((X %*% cv_lasso_coefs - X %*% beta0)^2)
+  bias[s, "CV Lasso"] <- mean(cv_lasso_coefs - beta0)  # Compute bias
+  coef_results[s, "CV Lasso"] <- mean(cv_lasso_coefs)
   
   # CV Post-Lasso
   selected_cv <- which(cv_lasso_coefs != 0)
@@ -77,21 +76,34 @@ for (s in 1:num_simulations) {
   post_cv_lasso_coefs <- rep(0, K)
   post_cv_lasso_coefs[selected_cv] <- coef(post_cv_lasso_fit)[-1]
   results[s, "CV Post-Lasso"] <- mean((X %*% post_cv_lasso_coefs - X %*% beta0)^2)
+  bias[s, "CV Post-Lasso"] <- mean(post_cv_lasso_coefs - beta0)  # Compute bias
+  coef_results[s, "CV Post-Lasso"] <- mean(post_cv_lasso_coefs)
   
-  # ORACLE
+  print(s)
 }
 
-# Average prediction errors
+# Average prediction errors and coefficients
 avg_prediction_errors <- colMeans(results)
+avg_bias <- colMeans(bias)
+avg_coefs <- colMeans(coef_results)
 
 # Tabulate results
 tabulated_results <- data.frame(
-  Estimator = colnames(results),
-  Average_Prediction_Error = round(avg_prediction_errors, 4)
+  Estimator = round(avg_coefs,4),
+  Average_Prediction_Error = round(avg_prediction_errors, 4),
+  Bias = round(avg_bias, 4)
 )
 
-print(tabulated_results) 
+# Print the results
+print(tabulated_results)
 
-# need to send to overleaf
+# Convert to LaTeX format
+library(xtable)
 
-## make into latex 
+# Create the LaTeX table with the caption
+latex_table <- xtable(tabulated_results, caption = "Lasso, prediction error, bias, and average coefficients", digits=c(0,4,4,4))
+
+# Save LaTeX code to a file with 4 decimal precision
+sink("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q3_table.tex")
+print(latex_table, include.rownames = FALSE, booktabs = TRUE)
+sink()

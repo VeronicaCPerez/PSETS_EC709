@@ -347,17 +347,15 @@ results <- data.frame(
 )
 
 # Create a ggplot object
-plot <- ggplot(results, aes(x = Method, y = Estimate, ymin = Estimate - StandardError, ymax = Estimate + StandardError)) +
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_2_coef_0_57.png")
+ggplot(results, aes(x = Method, y = Estimate, ymin = Estimate - StandardError, ymax = Estimate + StandardError)) +
   geom_point(size = 4) +
   geom_errorbar(width = 0.2) +
   labs(title = "Estimates with Standard Errors for Different Regression Methods",
        x = "Regression Method",
        y = "Estimate") +
   theme_minimal()
-
-# Print the plot
-print(plot)
-
+dev.off()
 
 
 ###########################################################################
@@ -574,11 +572,12 @@ dev.off()
 
 # Load necessary libraries
 library(hdm)
+library(ggplot2)
 
 # Load and process the data
-data <- read.dta("/Users/veronica/Dropbox/PhD/2024_2/EC_709/PSET1/yn.dta")
+data <- read.dta("/Users/veronica/Dropbox/PhD/2024_2/EC_709/PSETS_EC709/PSET1/yn.dta")
 
-# Create log-transformed variables and interaction terms if needed
+# Create log-transformed variables
 data$log_gas <- log(data$gas)
 data$log_price <- log(data$price)
 data$log_income <- log(data$income)
@@ -588,36 +587,63 @@ X <- data[, c("log_price", "log_income", "age", "driver", "hhsize", "month",
               "fueltype", "urban", "prov", "year", "distance", "youngsingle")]
 Y <- data$log_gas
 
-
-# LASSO ALL VARIABLES -----------------------------------------------------
-
-# Fit Lasso model with all variables
-lasso_model_all = rlasso(data$log_gas ~ log_price + age + driver + hhsize + fueltype + urban + prov + year, data , post = FALSE)  # use lasso, not-Post-lasso
-# lasso.reg = rlasso(X, Y, post=FALSE)
-summary_lasso <- summary(lasso_model_all, all = FALSE)  # can also do print(lasso.reg, all=FALSE)
-
+# LASSO WITHOUT INTERACTIONS ------------------------------------------------
+lasso_model_all = rlasso(log_gas ~ log_price + age + driver + hhsize + fueltype + urban + prov + year, data, post = FALSE)
+summary_lasso <- summary(lasso_model_all, all = FALSE)
 print(summary_lasso)
 
-# LASSO 2 WAY INTERACTIONS ------------------------------------------------
+# Create a grid of log_price values for prediction (continuous range)
+log_price_grid <- data.frame(log_price = seq(min(data$log_price), max(data$log_price), length.out = 100))
 
-# Prepare the data frame for interactions
-data_for_interactions <- data[, c("log_price", "log_income", "age", "driver", "hhsize", 
-                                  "month", "fueltype", "urban", "prov", "year", 
-                                  "distance", "youngsingle")]
-data_for_interactions$log_gas <- data$log_gas
+# Fill in the other variables with their means or medians (to control for other characteristics)
+log_price_grid$age <- median(data$age)
+log_price_grid$driver <- median(data$driver)
+log_price_grid$hhsize <- median(data$hhsize)
+log_price_grid$fueltype <- median(data$fueltype)
+log_price_grid$urban <- median(data$urban)
+log_price_grid$prov <- median(data$prov)
+log_price_grid$year <- median(data$year)
+log_price_grid$log_income <- median(data$log_income)
 
-# Create interaction terms
-data_interactions <- model.matrix(~ .^2 - 1, data = data_for_interactions)
+# Predict over the log_price grid using the model without interactions
+predictions_grid_all <- predict(lasso_model_all, newdata = log_price_grid)
 
-# Extract response
-Y_interactions <- data_interactions[, "log_gas"]
+# LASSO WITH INTERACTIONS --------------------------------------------------
 
-# Remove the response column from the predictors matrix
-X_interactions <- data_interactions[, -which(colnames(data_interactions) == "log_gas")]
+# Create interaction terms for the training data
+data_for_interactions <- data
+data_for_interactions$log_price_log_income <- data$log_price * data$log_income
+data_for_interactions$log_price_age <- data$log_price * data$age
+# Add more interaction terms as necessary...
 
 # Fit Lasso model with interactions
-lasso_model_interactions <- rlasso(X_interactions, Y_interactions, post = FALSE)
+lasso_model_interactions <- rlasso(log_gas ~ log_price + log_income + age + driver + hhsize + 
+                                     fueltype + urban + prov + year + log_price_log_income + 
+                                     log_price_age, data = data_for_interactions, post = FALSE)
 
-# Display the summary of the Lasso model with interactions
-summary_lasso_interactions <- summary(lasso_model_interactions, all = FALSE)
-print(summary_lasso_interactions)
+# Create interaction terms for the prediction grid
+log_price_grid_for_interactions <- log_price_grid
+log_price_grid_for_interactions$log_price_log_income <- log_price_grid$log_price * log_price_grid$log_income
+log_price_grid_for_interactions$log_price_age <- log_price_grid$log_price * log_price_grid$age
+
+# Predict over the log_price grid using the model with interactions
+predictions_grid_interactions <- predict(lasso_model_interactions, newdata = log_price_grid_for_interactions)
+
+# Plot demand function for the model without interactions
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_4_lasso_nointer.png")
+ggplot(log_price_grid, aes(x = log_price)) +
+  geom_line(aes(y = predictions_grid_all), color = "red") +
+  ggtitle("Demand Function: Without Interactions") +
+  xlab("Log Price") +
+  ylab("Predicted Log Gas")
+dev.off()
+
+# Plot demand function for the model with interactions
+png("/Users/veronica/Dropbox/Apps/Overleaf/EC_709_vcperez/PSET_1/Q2_4_lasso_inter.png")
+ggplot(log_price_grid, aes(x = log_price)) +
+  geom_line(aes(y = predictions_grid_interactions), color = "green") +
+  ggtitle("Demand Function: With Interactions") +
+  xlab("Log Price") +
+  ylab("Predicted Log Gas")
+dev.off()
+
