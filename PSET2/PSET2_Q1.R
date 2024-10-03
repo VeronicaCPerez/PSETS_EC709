@@ -298,7 +298,7 @@ stargazer(
 late_bootstrap_se <- c(sd(boot(data, boot_nonparametric, n_boot)$t), 
                        sd(boot(data, boot_propensity, n_boot)$t), 
                        sd(boot(data, boot_nonparametric, n_boot)$t)) 
-)
+
 # Update the LATE results data frame to include standard errors
 late_results <- data.frame(
   Method = c("Nonparametric Regression", "Propensity Score Reweighting", "Doubly Robust"),
