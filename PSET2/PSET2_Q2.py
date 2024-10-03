@@ -1,13 +1,15 @@
 import pandas as pd
 from rdrobust import rdrobust
 from rddensity import rddensity
+from scipy.stats import binom_test
+
 
 #############################################################
 ## Data Loading and Preparation
 #############################################################
 
 # Load dataset
-headstart_data = pd.read_stata('headstart.dta')
+headstart_data = pd.read_stata('/Users/veronica/Dropbox/PhD/2024_2/EC_709/PSETS_EC709/PSET2/headstart.dta')
 
 # Define cutoff point
 cutoff_value = 59.1984
@@ -23,26 +25,12 @@ covariates_1960 = headstart_data[['census1960_pop',
                                     'census1960_pcturban',
                                     'census1960_pctblack']]
 
-# Extracting covariates from the 1990 Census
-covariates_1990 = headstart_data[['census1990_pop',
-                                    'census1990_pop1824',
-                                    'census1990_pop2534',
-                                    'census1990_pop3554',
-                                    'census1990_pop55plus',
-                                    'census1990_pcturban',
-                                    'census1990_pctblack',
-                                    'census1990_percapinc']]
-
 # Define the outcome variable, running variable, and treatment
 outcome_variable = headstart_data['mort_age59_related_postHS']
 raw_running_variable = headstart_data['povrate60']
 running_variable = raw_running_variable - cutoff_value
 
 treatment_indicator = (running_variable >= 0).astype(int)
-
-# Placebo outcomes
-placebo_outcomes = headstart_data[['mort_age59_injury_postHS', 
-                                     'mort_age59_related_preHS']]
 
 #############################################################
 ## Figure 1: Scatter Plot and RD Analysis
